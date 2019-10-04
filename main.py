@@ -7,6 +7,7 @@ from lane_finder import LaneFinder
 parser = argparse.ArgumentParser(description='Input parameters parser')
 parser.add_argument('-input', type=str, help='path of input picture or video', default=None)
 parser.add_argument('-output', type=str, help='path of output picture or video', default=None)
+parser.add_argument('-calibration_path', type=str, help='path to folder with calibration chessboard images', default=None)
 args = parser.parse_args()
 
 # Parameters logic
@@ -22,7 +23,7 @@ if args.input.split('.')[-1] in image_ext and args.output.split('.')[-1] in imag
 
 # Call proper method
 if mode == "video" or mode == "image":
-    lane_finder = LaneFinder(args.input, args.output, mode)
+    lane_finder = LaneFinder(args.input, args.output, args.calibration_path, mode)
     lane_finder.process()
     print("DONE.")
 else:
