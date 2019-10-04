@@ -1,0 +1,2 @@
+class Calibration:
+    pass
