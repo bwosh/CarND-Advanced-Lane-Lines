@@ -9,9 +9,18 @@ class LanePipeline:
     def calibrate(self, folder_path: str):
         self.calibration.run(folder_path)
 
-    def get_binary_map(self, gbr_frame:np.ndarray):
-        grayscale = cv2.cvtColor(gbr_frame, cv2.COLOR_BGR2GRAY)
-        return grayscale>128 # TODO implement sobel ans saturation threshold
+    def get_binary_map(self, bgr_frame:np.ndarray):
+        hls = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2HLS)
+        r = bgr_frame[:,:,2]
+        s = hls[:,:,2]
+
+        r_thresh = (190, 255)
+        r_binary = (r>r_thresh[0]) & (r<=r_thresh[1])
+
+        s_thresh = (90,255)
+        s_binary = (s>s_thresh[0]) & (s<=s_thresh[1])
+
+        return s_binary*r_binary
 
     def get_bird_eye_frame(self, binary_frame:np.ndarray):
         return binary_frame # TODO implement bir eye transformtion
@@ -25,18 +34,18 @@ class LanePipeline:
         # TODO get lane curvature
         return None
 
-    def draw_lanes(self, gbr_frame:np.ndarray, lane_boundaries):
+    def draw_lanes(self, bgr_frame:np.ndarray, lane_boundaries):
         # TODO draw lanes
-        return gbr_frame
+        return bgr_frame
 
-    def post_process(self, gbr_frame:np.ndarray, text:str=None):
+    def post_process(self, bgr_frame:np.ndarray, text:str=None):
         if text:
-            cv2.putText(gbr_frame, f"{text}", (10,20), cv2.FONT_HERSHEY_PLAIN, 1, (0,255,0), lineType=cv2.LINE_AA)
-        return gbr_frame
+            cv2.putText(bgr_frame, f"{text}", (10,20), cv2.FONT_HERSHEY_PLAIN, 1, (0,255,0), lineType=cv2.LINE_AA)
+        return bgr_frame
 
-    def process_frame(self, gbr_frame:np.ndarray, text:str=None):
+    def process_frame(self, bgr_frame:np.ndarray, text:str=None):
         # Prepare variables
-        frame  = gbr_frame.copy()
+        frame  = bgr_frame.copy()
         data = {} 
 
         # Pipeline

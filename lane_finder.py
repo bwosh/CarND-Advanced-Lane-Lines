@@ -74,8 +74,8 @@ class LaneFinder:
 
         cv2.imwrite(filepath, to_save)
 
-    def __process_frame(self, gbr_frame: np.ndarray, text = None):
+    def __process_frame(self, bgr_frame: np.ndarray, text = None):
         if not self.lane_pipeline.calibration.is_calibrated():
             self.lane_pipeline.calibrate(self.calibration_path)
 
-        return self.lane_pipeline.process_frame(gbr_frame, text=text)
+        return self.lane_pipeline.process_frame(bgr_frame, text=text)

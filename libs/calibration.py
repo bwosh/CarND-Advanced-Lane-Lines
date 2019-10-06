@@ -28,18 +28,13 @@ class Calibration:
             ret, corners = cv2.findChessboardCorners(gray, (self.chessboardNx, self.chessboardNy), None)
             if ret and gray.shape[1]==1280 and gray.shape[0]==720:
                 print("Calibration file:", file, corners.shape, img.shape)
-                #corners = corners.reshape(-1,1,3)
                 cal_corners.append(corners)
-                #print(imgpoints.shape)
                 cal_imgpoints.append(imgpoints)
             else:
                 print("BROKEN calibration file:", file)
 
         cal_corners = np.array(cal_corners)
         cal_imgpoints = np.array(cal_imgpoints)
-
-        print(cal_corners.shape)
-        print(cal_imgpoints.shape)
 
         ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(cal_imgpoints, cal_corners, gray.shape[::-1], None, None)
 
@@ -48,9 +43,9 @@ class Calibration:
 
         self.calibrated = True
 
-    def undistort(self, gbr_frame: np.ndarray):
-        undist = cv2.undistort(gbr_frame, self.mtx, self.dist, None, self.mtx)
+    def undistort(self, bgr_frame: np.ndarray):
+        undist = cv2.undistort(bgr_frame, self.mtx, self.dist, None, self.mtx)
         return undist
 
-    def distort(self, gbr_frame: np.ndarray):
-        return gbr_frame # TODO
+    def distort(self, bgr_frame: np.ndarray):
+        return bgr_frame # TODO distort back
