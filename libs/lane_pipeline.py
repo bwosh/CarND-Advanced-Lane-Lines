@@ -40,23 +40,25 @@ class LanePipeline:
         data = {} 
 
         # Pipeline
+        data['00_original'] = frame.copy()
+
         frame = self.calibration.undistort(frame)
-        data['undistorted'] = frame.copy()
+        data['01_undistorted'] = frame.copy()
 
         bin_frame = self.get_binary_map(frame)
-        data['bin_frame'] = bin_frame.copy()
+        data['02_bin_frame'] = bin_frame.copy()
 
         bird_eye_frame = self.get_bird_eye_frame(bin_frame)
-        data['bird_eye_frame'] = bird_eye_frame.copy()
+        data['03_bird_eye_frame'] = bird_eye_frame.copy()
 
         lane_boundaries = self.get_lane_boundaries(bird_eye_frame)
         curvature = self.get_lane_curvature(bird_eye_frame, lane_boundaries)
 
         frame = self.draw_lanes(frame, lane_boundaries)
-        data['lanes_still_undistorted'] = frame.copy()
+        data['04_lanes_still_undistorted'] = frame.copy()
 
         frame = self.calibration.distort(frame)
-        data['lanes_on_original'] = frame.copy()
+        data['05_lanes_on_original'] = frame.copy()
 
         frame = self.post_process(frame, text=text)
 
