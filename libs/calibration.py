@@ -11,7 +11,7 @@ class Calibration:
     def is_calibrated(self):
         return self.calibrated
 
-    def run(self, folder_path: str):
+    def run(self, folder_path: str, verbose=False):
         print("Running calibration...")
         calibration_files = list(os.listdir(folder_path))
         calibration_files.sort()
@@ -27,11 +27,13 @@ class Calibration:
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             ret, corners = cv2.findChessboardCorners(gray, (self.chessboardNx, self.chessboardNy), None)
             if ret and gray.shape[1]==1280 and gray.shape[0]==720:
-                print("Calibration file:", file, corners.shape, img.shape)
+                if verbose:
+                    print("Calibration file:", file, corners.shape, img.shape)
                 cal_corners.append(corners)
                 cal_imgpoints.append(imgpoints)
             else:
-                print("BROKEN calibration file:", file)
+                if verbose:
+                    print("BROKEN calibration file:", file)
 
         cal_corners = np.array(cal_corners)
         cal_imgpoints = np.array(cal_imgpoints)

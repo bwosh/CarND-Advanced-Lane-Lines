@@ -72,6 +72,7 @@ class LaneFinder:
         if to_save is None:      
             raise Exception(f"Unknown data format:{data.dtype}, {data.shape}")
 
+        to_save = cv2.pyrDown(cv2.pyrDown(to_save))
         cv2.imwrite(filepath, to_save)
 
     def __process_frame(self, bgr_frame: np.ndarray, text = None):
