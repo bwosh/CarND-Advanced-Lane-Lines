@@ -46,6 +46,3 @@ class Calibration:
     def undistort(self, bgr_frame: np.ndarray):
         undist = cv2.undistort(bgr_frame, self.mtx, self.dist, None, self.mtx)
         return undist
-
-    def distort(self, bgr_frame: np.ndarray):
-        return bgr_frame # TODO distort back

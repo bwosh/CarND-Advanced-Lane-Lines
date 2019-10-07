@@ -22,8 +22,46 @@ class LanePipeline:
 
         return s_binary*r_binary
 
-    def get_bird_eye_frame(self, binary_frame:np.ndarray):
-        return binary_frame # TODO implement bir eye transformtion
+    def get_bird_eye_frame(self, binary_frame:np.ndarray, debug=True):
+        h,w = binary_frame.shape
+
+        # Source Top/Bottom Left/Right points
+        bl = [w//7, h]
+        br = [w-w//7, h]
+        tl = [w//2-w//20,h//2+h//7]
+        tr = [w//2+w//20,h//2+h//7]
+        src = np.array([tl,tr, br, bl], dtype=np.float32)
+        src_pts = np.array([[tl,tr, br, bl]], dtype=np.int64)
+
+        # Target Top/Bottom Left/Right points
+        t_bl = [w//6, h]
+        t_br = [w-w//6, h]
+        t_tl = [w//6,0]
+        t_tr = [w-w//6,0]
+        dst = np.array([t_tl,t_tr, t_br, t_bl], dtype=np.float32)
+        dst_pts = np.array([[t_tl,t_tr, t_br, t_bl]], dtype=np.int64)
+        print(src.shape, src.dtype)
+        print(dst.shape, dst.dtype)
+        
+        M = cv2.getPerspectiveTransform(src, dst)
+
+        img = np.zeros((h,w,3), dtype='uint8')
+        img[:,:,0] = binary_frame * 255
+        img[:,:,1] = binary_frame * 255
+        img[:,:,2] = binary_frame * 255
+
+        if debug:
+            preview = img.copy()
+            warped = cv2.warpPerspective(preview, M, (w, h), flags=cv2.INTER_LINEAR)
+            cv2.polylines(warped, dst_pts, True,(0,0,255),5)
+            cv2.imwrite("temp_birdline_area_warped.jpg",warped)
+
+            cv2.polylines(preview, src_pts, True,(0,0,255),5)
+            cv2.imwrite("temp_birdline_area_1.jpg",preview)
+
+        warped = cv2.warpPerspective(img, M, (w, h), flags=cv2.INTER_LINEAR)
+
+        return warped 
 
     def get_lane_boundaries(self,  binary_frame:np.ndarray):
         left_minx,left_maxx, right_minx, right_maxx = 0,0,0,0
@@ -66,10 +104,8 @@ class LanePipeline:
         frame = self.draw_lanes(frame, lane_boundaries)
         data['04_lanes_still_undistorted'] = frame.copy()
 
-        frame = self.calibration.distort(frame)
-        data['05_lanes_on_original'] = frame.copy()
-
         frame = self.post_process(frame, text=text)
+        data['05_post_processed'] = frame.copy()
 
         return frame, data
 
