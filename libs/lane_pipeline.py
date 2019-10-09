@@ -22,8 +22,15 @@ class LanePipeline:
 
         return s_binary*r_binary
 
-    def get_bird_eye_frame(self, binary_frame:np.ndarray, data, debug=True):
-        h,w = binary_frame.shape
+    def get_bird_eye_frame(self, binary_frame:np.ndarray, data, debug=True, inverse=False):
+        h,w = binary_frame.shape[0], binary_frame.shape[1]
+        img = np.zeros((h,w,3), dtype='uint8')
+        if len(binary_frame.shape)==2:
+            img[:,:,0] = binary_frame * 255
+            img[:,:,1] = binary_frame * 255
+            img[:,:,2] = binary_frame * 255
+        else:
+            img[:,:,:] = binary_frame
 
         # Source Top/Bottom Left/Right points
         bl = [w//7, h]
@@ -41,12 +48,10 @@ class LanePipeline:
         dst = np.array([t_tl,t_tr, t_br, t_bl], dtype=np.float32)
         dst_pts = np.array([[t_tl,t_tr, t_br, t_bl]], dtype=np.int64)
         
-        M = cv2.getPerspectiveTransform(src, dst)
-
-        img = np.zeros((h,w,3), dtype='uint8')
-        img[:,:,0] = binary_frame * 255
-        img[:,:,1] = binary_frame * 255
-        img[:,:,2] = binary_frame * 255
+        if not inverse:
+            M = cv2.getPerspectiveTransform(src, dst)
+        else:
+            M = cv2.getPerspectiveTransform(dst, src)
 
         if debug:
             preview = img.copy()
@@ -67,6 +72,8 @@ class LanePipeline:
         if np.isnan(index_weight):
             return None
         index = np.arange(0,len(index))* index
+        if index_weight==0:
+            return None
         index = np.sum(index)/index_weight
         if np.isnan(index):
             return None 
@@ -94,6 +101,9 @@ class LanePipeline:
         padding = 90
         window_number = 12
         window_height = h//window_number
+
+        left_points = []
+        right_points = []
 
         for window_index in range(window_number):
             x1l = current_left_x - padding
@@ -124,11 +134,13 @@ class LanePipeline:
 
             # Shift windows 
             if max_left_index is not None:
+                left_points.append((x1l+max_left_index,y1+(y2-y1)//2))
                 current_left_x += max_left_index-padding
                 if current_left_x < padding:
                     current_left_x = padding
 
             if max_right_index is not None:
+                right_points.append((x1r+max_right_index,y1+(y2-y1)//2))
                 current_right_x += max_right_index-padding
                 if current_right_x > w-padding:
                     current_right_x = w-padding
@@ -136,14 +148,56 @@ class LanePipeline:
         if debug:
             data['04_windows'] = preview
 
-        return [left_minx,left_maxx, right_minx, right_maxx]
+        lfit = None
+        if len(left_points)>=3:
+            left_points = np.array(left_points)
+            # a*x**2 + b*x+ c
+            lfit = np.polyfit(left_points[:,1],left_points[:,0], 2)
+
+        rfit=None
+        if len(right_points)>=3:
+            right_points = np.array(right_points)
+            # a*x**2 + b*x+ c
+            rfit = np.polyfit(right_points[:,1],right_points[:,0], 2)
+
+        return lfit, rfit
 
     def get_lane_curvature(self,  binary_frame:np.ndarray, lane_boundaries):
         # TODO get lane curvature
         return None
 
     def draw_lanes(self, bgr_frame:np.ndarray, lane_boundaries):
-        # TODO draw lanes
+        lfit, rfit = lane_boundaries
+        ploty = np.linspace(0, bgr_frame.shape[0]-1, bgr_frame.shape[0] )
+
+        if lfit is not None:
+            lfitx = lfit[0]*ploty**2 + lfit[1]*ploty + lfit[2]
+        if rfit is not None:
+            rfitx = rfit[0]*ploty**2 + rfit[1]*ploty + rfit[2]
+
+        padding = 8
+
+        for i in range(ploty.shape[0]):
+            y = int(ploty[i])
+
+            # draw right lane
+            if rfit is not None:
+                xr = int(rfitx[i])
+                if xr>=padding and xr<bgr_frame.shape[1]-padding:
+                    bgr_frame[y-padding:y+padding,xr-padding:xr+padding,:] = [255,0,0]
+
+            # draw left lane
+            if lfit is not None:
+                xl = int(lfitx[i])
+                if xl>=0 and xl<1280:
+                    bgr_frame[y-padding:y+padding,xl-padding:xl+padding,:] = [0,0,255]
+
+            # draw mid area
+            if lfit is not None and rfit is not None:
+                x_range = np.clip(np.array([xl+padding+1,xr-padding-1]),0,bgr_frame.shape[1]-1)
+                if x_range[0]<x_range[1]:
+                    bgr_frame[y,x_range[0]:x_range[1],:] = [0,127,0]+ bgr_frame[y,x_range[0]:x_range[1],:]//2
+
         return bgr_frame
 
     def post_process(self, bgr_frame:np.ndarray, text:str=None):
@@ -152,6 +206,10 @@ class LanePipeline:
         return bgr_frame
 
     def process_frame(self, bgr_frame:np.ndarray, text:str=None):
+        # TODO average with last frame, 
+        # TODO reuse lanes if new not found
+        # TODO generate all test images output
+
         # Prepare variables
         frame  = bgr_frame.copy()
         data = {} 
@@ -160,7 +218,8 @@ class LanePipeline:
         data['00_original'] = frame.copy()
 
         frame = self.calibration.undistort(frame)
-        data['01_undistorted'] = frame.copy()
+        undistorted = frame.copy()
+        data['01_undistorted'] = undistorted
 
         bin_frame = self.get_binary_map(frame)
         data['02_bin_frame'] = bin_frame.copy()
@@ -168,14 +227,26 @@ class LanePipeline:
         bird_eye_frame = self.get_bird_eye_frame(bin_frame, data)
         data['03c_bird_eye_frame'] = bird_eye_frame.copy()
 
+        frame = self.get_bird_eye_frame(frame, data)
+        data['03d_bird_eye_frame'] = frame.copy()
+
         lane_boundaries = self.get_lane_boundaries(bird_eye_frame, data)
         curvature = self.get_lane_curvature(bird_eye_frame, lane_boundaries)
 
-        frame = self.draw_lanes(frame, lane_boundaries)
-        data['05_lanes_still_undistorted'] = frame.copy()
+        bframe = self.draw_lanes(bird_eye_frame, lane_boundaries) 
+        data['05a_lanes_still_undistorted'] = bframe.copy()
+
+        frame = self.draw_lanes(frame, lane_boundaries) 
+        data['05b_lanes_still_undistorted'] = frame.copy()
+
+        frame = self.get_bird_eye_frame(frame, data, debug=False, inverse=True) 
+        selection = np.expand_dims((frame[:,:,0] == 0) & (frame[:,:,1] == 0) & (frame[:,:,2] == 0), axis=2)
+        frame = selection * undistorted + (1-selection)*frame
+        frame = frame.astype('uint8')
+        data['06_back_to_perspective'] = frame.copy()
 
         frame = self.post_process(frame, text=text)
-        data['06_post_processed'] = frame.copy()
+        data['07_post_processed'] = frame.copy()
 
         return frame, data
 
