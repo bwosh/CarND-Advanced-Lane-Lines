@@ -45,10 +45,10 @@ The pipeline
 8. Basing on centers of lanes inside areas find quadratic function that matches the points and plot the lanes  
 ![Raw image](examples/straight_lines1_05a_lanes_still_undistorted.jpg "Raw image")![Raw image](examples/test1_05a_lanes_still_undistorted.jpg "Raw image") 
 
-9. Perform lane drawing on bird-eye view of the original image
+9. Perform lane drawing on bird-eye view of the original image  
 ![Raw image](examples/straight_lines1_05b_lanes_still_undistorted.jpg "Raw image")![Raw image](examples/test1_05b_lanes_still_undistorted.jpg "Raw image") 
 
-10. Invert perspective transform and merge result with undistorted part of images that were out-of bounds of bird-eye view
+10. Invert perspective transform and merge result with undistorted part of images that were out-of bounds of bird-eye view  
 ![Raw image](examples/straight_lines1_06_back_to_perspective.jpg "Raw image")![Raw image](examples/test1_06_back_to_perspective.jpg "Raw image") 
 
 (more to come...)
