@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 from libs.calibration import Calibration
 
+import matplotlib.pyplot as plt
+
 class LanePipeline:
     def __init__(self):
         self.calibration = Calibration()
@@ -10,17 +12,26 @@ class LanePipeline:
         self.calibration.run(folder_path)
 
     def get_binary_map(self, bgr_frame:np.ndarray):
+        # Use grayscale taken as half of saturation and hald of red channel of RGB
         hls = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2HLS)
         r = bgr_frame[:,:,2]
         s = hls[:,:,2]
+        gray = s//2+r//2
 
+        # Calculate magnitude of Sobel x & y 
+        sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0)
+        sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1)
+        gradmag = np.sqrt(sobelx**2 + sobely**2)
+        scale_factor = np.max(gradmag)/255 
+        gradmag = (gradmag/scale_factor).astype(np.uint8) 
+
+        # Threshold Red Color and Saturation
         r_thresh = (190, 255)
         r_binary = (r>r_thresh[0]) & (r<=r_thresh[1])
-
         s_thresh = (90,255)
         s_binary = (s>s_thresh[0]) & (s<=s_thresh[1])
 
-        return s_binary*r_binary
+        return (gradmag>50) | (s_binary*r_binary)
 
     def get_bird_eye_frame(self, binary_frame:np.ndarray, data, debug=True, inverse=False):
         h,w = binary_frame.shape[0], binary_frame.shape[1]
@@ -90,15 +101,22 @@ class LanePipeline:
         binary_frame = (binary_frame[:,:,0]/255).astype(int)
 
         # Measure midpoints of left & right part in lower bottom of an immage
-        bottom_half = (binary_frame[w//2:,:])
+        bottom_half = (binary_frame[h//2:,:])
         histogram = np.sum(bottom_half, axis=0)
+        if debug:
+            fig = plt.figure()
+            plt.plot(histogram)
+            plt.savefig('histogram.png')
+            data['hist']=cv2.imread('histogram.png')
+            plt.close()
+
         max_left_index = np.argmax(histogram[:w//2])
         max_right_index = np.argmax(histogram[w//2:]) + w//2
 
         # Line area search parameters
         current_left_x = max_left_index
         current_right_x = max_right_index
-        padding = 90
+        padding = 110
         window_number = 12
         window_height = h//window_number
 
@@ -206,9 +224,10 @@ class LanePipeline:
         return bgr_frame
 
     def process_frame(self, bgr_frame:np.ndarray, text:str=None):
+        # TODO generate all test images output
         # TODO average with last frame, 
         # TODO reuse lanes if new not found
-        # TODO generate all test images output
+        # TODO challanges
 
         # Prepare variables
         frame  = bgr_frame.copy()

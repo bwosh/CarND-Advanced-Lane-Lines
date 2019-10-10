@@ -42,6 +42,10 @@ The pipeline
 7. Starting from bottom search for centers of mass inside rectangular areas (while shifting window to new center)  
 ![Raw image](examples/straight_lines1_04_windows.jpg "Raw image")![Raw image](examples/test1_04_windows.jpg "Raw image")  
 
+Bottom start place is calculated basing on historam of bottom part of binary lanes image in axis of x like so:  
+![Raw image](examples/straight_lines1_hist.jpg "Raw image")
+![Raw image](examples/test1_hist.jpg "Raw image")
+
 8. Basing on centers of lanes inside areas find quadratic function that matches the points and plot the lanes  
 ![Raw image](examples/straight_lines1_05a_lanes_still_undistorted.jpg "Raw image")![Raw image](examples/test1_05a_lanes_still_undistorted.jpg "Raw image") 
 

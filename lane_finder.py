@@ -5,13 +5,15 @@ from tqdm import tqdm
 from libs.lane_pipeline import LanePipeline
 
 class LaneFinder:
-    def __init__(self, input_path: str, output_path: str, calibration_path: str, mode: str, multiview: bool):
+    def __init__(self, input_path: str, output_path: str, calibration_path: str, mode: str, multiview: bool, frame_from, frame_to):
         self.input_path = input_path
         self.output_path = output_path
         self.calibration_path = calibration_path
         self.mode = mode
         self.lane_pipeline = LanePipeline()
         self.multiview = multiview
+        self.frame_from = frame_from
+        self.frame_to = frame_to
 
     def process(self, show_progress=True):
         if self.mode == 'video':
@@ -43,7 +45,6 @@ class LaneFinder:
         return output
 
     def __process_video(self):
-        # TODO add split video mode
         frame_index = 0
         cap = cv2.VideoCapture(self.input_path)
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -57,17 +58,18 @@ class LaneFinder:
             while(cap.isOpened()):
                 ret, frame = cap.read()
                 if ret:
-                    if out is None:
-                        width = frame.shape[1]
+                    if frame_index>= self.frame_from and frame_index<=self.frame_to:
+                        if out is None:
+                            width = frame.shape[1]
+                            if self.multiview:
+                                width *= 2
+                            out = cv2.VideoWriter(self.output_path, cv2.VideoWriter_fourcc('M','J','P','G'), fps, (width,frame.shape[0]))
+
+                        processed, data = self.__process_frame(frame, text=f"{frame_index}")
                         if self.multiview:
-                            width *= 2
-                        out = cv2.VideoWriter(self.output_path, cv2.VideoWriter_fourcc('M','J','P','G'), fps, (width,frame.shape[0]))
+                            processed = self.__merge_frames(processed, data)
 
-                    processed, data = self.__process_frame(frame, text=f"{frame_index}")
-                    if self.multiview:
-                        processed = self.__merge_frames(processed, data)
-
-                    out.write(processed)
+                        out.write(processed)
                     frame_index+=1
                     p.update(1)
                 else:
