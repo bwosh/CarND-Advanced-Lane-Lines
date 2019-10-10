@@ -5,12 +5,13 @@ from tqdm import tqdm
 from libs.lane_pipeline import LanePipeline
 
 class LaneFinder:
-    def __init__(self, input_path: str, output_path: str, calibration_path: str, mode: str):
+    def __init__(self, input_path: str, output_path: str, calibration_path: str, mode: str, multiview: bool):
         self.input_path = input_path
         self.output_path = output_path
         self.calibration_path = calibration_path
         self.mode = mode
         self.lane_pipeline = LanePipeline()
+        self.multiview = multiview
 
     def process(self, show_progress=True):
         if self.mode == 'video':
@@ -19,7 +20,30 @@ class LaneFinder:
         if self.mode == 'image':
             self.__process_image()
 
+    def __merge_frames(self, key_frame, dict_of_frames):
+        output = np.zeros((key_frame.shape[0],key_frame.shape[1]*2,3),dtype='uint8')
+        output[:,:key_frame.shape[1],:] = key_frame
+
+        for keyid, key in enumerate(dict_of_frames.keys()):
+            y = keyid // 4
+            x = keyid % 4
+            ws = key_frame.shape[1]//4
+            hs = key_frame.shape[0]//4
+
+            miniframe = dict_of_frames[key]
+            if len(miniframe.shape)==2:
+                miniframe = np.dstack((miniframe, miniframe, miniframe))
+            if str(miniframe.dtype) == 'bool':
+                miniframe = miniframe.astype('uint8')*255
+            miniframe = cv2.pyrDown(cv2.pyrDown(miniframe))
+
+            output[y*hs:y*hs+miniframe.shape[0],
+                   key_frame.shape[1]+x*ws:key_frame.shape[1]+x*ws+miniframe.shape[1]] = miniframe
+
+        return output
+
     def __process_video(self):
+        # TODO add split video mode
         frame_index = 0
         cap = cv2.VideoCapture(self.input_path)
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -34,9 +58,15 @@ class LaneFinder:
                 ret, frame = cap.read()
                 if ret:
                     if out is None:
-                        out = cv2.VideoWriter(self.output_path, cv2.VideoWriter_fourcc('M','J','P','G'), fps, (frame.shape[1],frame.shape[0]))
+                        width = frame.shape[1]
+                        if self.multiview:
+                            width *= 2
+                        out = cv2.VideoWriter(self.output_path, cv2.VideoWriter_fourcc('M','J','P','G'), fps, (width,frame.shape[0]))
 
-                    processed, _ = self.__process_frame(frame, text=f"{frame_index}")
+                    processed, data = self.__process_frame(frame, text=f"{frame_index}")
+                    if self.multiview:
+                        processed = self.__merge_frames(processed, data)
+
                     out.write(processed)
                     frame_index+=1
                     p.update(1)
