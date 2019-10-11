@@ -1,9 +1,5 @@
 ## Advanced Lane Finding
 
-### Work in progress...
-
-
-
 The goals of this project are the following:
 
 * Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
@@ -58,4 +54,22 @@ Bottom start place is calculated basing on historam of bottom part of binary lan
 10. Invert perspective transform and merge result with undistorted part of images that were out-of bounds of bird-eye view  
 ![Raw image](examples/straight_lines1_06_back_to_perspective.jpg "Raw image")![Raw image](examples/test1_06_back_to_perspective.jpg "Raw image") 
 
-(more to come...)
+11. The radius of lanes has been calculated by applying [radius of curvature](https://www.intmath.com/applications-differentiation/8-radius-curvature.php) method. Since the video is recorded in known location and it is a turn of radius approx 1km a linear correlation between pixel radius and meters were calculated using average of values when the car is turning. 
+
+12. Basing on left and right lane curves the pixel range of lane is calculated. Knowing the width of lane in real world pixel-to-meters ratio is calculated. Then after calculating the center between lanes off-center vlue is calculated. All calculated values are shown on last frame.  
+
+
+
+---
+
+### Output video: 
+![Raw image](examples/video.png "Raw image") 
+[Download video file](/examples/sample.mp4)
+
+---
+
+### Other test images with respective results
+[Go to folder](/examples)
+
+---
+

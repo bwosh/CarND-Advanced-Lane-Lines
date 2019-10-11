@@ -10,6 +10,7 @@ class LanePipeline:
     def __init__(self):
         self.calibration = Calibration()
         self.history=[]
+        self.curvatures_history = []
         self.history_lenght = 3
         self.frame_index = 0
 
@@ -186,8 +187,20 @@ class LanePipeline:
         return lfit, rfit
 
     def get_lane_curvature(self,  binary_frame:np.ndarray, lane_boundaries):
-        # TODO get lane curvature and position
-        return None
+        y_eval = binary_frame.shape[0]-1
+        left_fit, right_fit = lane_boundaries
+        left_curverad, right_curverad = None, None
+
+        try:
+            if left_fit is not None:
+                left_curverad = ((1 + (2*left_fit[0]*y_eval + left_fit[1])**2)**1.5) / np.absolute(2*left_fit[0])
+
+            if right_fit is not None:
+                right_curverad = ((1 + (2*right_fit[0]*y_eval + right_fit[1])**2)**1.5) / np.absolute(2*right_fit[0])
+
+            return left_curverad, right_curverad
+        except:
+            return 0, 0
 
     def draw_lanes(self, bgr_frame:np.ndarray, lane_boundaries):
         lfit, rfit = lane_boundaries
@@ -199,6 +212,8 @@ class LanePipeline:
             rfitx = rfit[0]*ploty**2 + rfit[1]*ploty + rfit[2]
 
         padding = 8
+        xr = bgr_frame.shape[1]-1
+        xl = 0
 
         for i in range(ploty.shape[0]):
             y = int(ploty[i])
@@ -221,11 +236,19 @@ class LanePipeline:
                 if x_range[0]<x_range[1]:
                     bgr_frame[y,x_range[0]:x_range[1],:] = [0,127,0]+ bgr_frame[y,x_range[0]:x_range[1],:]//2
 
-        return bgr_frame
+        return bgr_frame, xl, xr
 
-    def post_process(self, bgr_frame:np.ndarray, curvature, text:str=None):
+    def post_process(self, bgr_frame:np.ndarray, curvature, position:str, text:str=None):
+        curvature_l, curvature_r = curvature
+        curvature_mean = (curvature_l+curvature_r)/2
+        pixels_to_meters = 1/3.5
+        curvature_mean *= pixels_to_meters
+        curvature_mean = int(curvature_mean)
+
         if text:
-            cv2.putText(bgr_frame, f"{text}", (10,20), cv2.FONT_HERSHEY_PLAIN, 1, (0,255,0), lineType=cv2.LINE_AA)
+            cv2.putText(bgr_frame, f"{text}", (10,20), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), lineType=cv2.LINE_AA)
+        cv2.putText(bgr_frame, f"Approx curve radius: {curvature_mean} m", (10,50), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), lineType=cv2.LINE_AA)
+        cv2.putText(bgr_frame, f"Position: {position}", (10,80), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), lineType=cv2.LINE_AA)
         return bgr_frame
 
     def save_history_entry(self, lane_boundaries):
@@ -247,10 +270,34 @@ class LanePipeline:
         r_params = np.mean(np.array(r_params), axis=0)
         return l_params, r_params
 
-    def process_frame(self, bgr_frame:np.ndarray, text:str=None):
-        # TODO generate all test images output
-        # TODO challanges: ignore too much white, ignore to little white
+    def save_history_curvature(self,value):
+        self.curvatures_history.append(value)
+        self.curvatures_history = self.curvatures_history[-self.history_lenght:]
 
+    def average_curvature(self):
+        return np.mean(self.curvatures_history, axis=0)
+
+    def in_lane_position(self, left_bottom_lane_x, right_bottom_lane_x, frame_shape):
+        # center of frame + road size
+        center = frame_shape[1]//2
+        road_width = 3.7
+
+        # get position in terms of pixels
+        pixel_to_meters = road_width/(right_bottom_lane_x-left_bottom_lane_x)
+        position_center = right_bottom_lane_x + (left_bottom_lane_x-right_bottom_lane_x)//2
+
+        # calculate shift with center in meters
+        off_center = (position_center-center) * pixel_to_meters
+
+        if abs(off_center) < 0.01:
+            return "center"
+
+        if off_center>0:
+            return f"{off_center:0.2f}m left"
+
+        return f"{-off_center:0.2f}m right"
+
+    def process_frame(self, bgr_frame:np.ndarray, text:str=None):
         # Prepare variables
         frame  = bgr_frame.copy()
         data = {} 
@@ -272,15 +319,18 @@ class LanePipeline:
         data['03d_bird_eye_frame'] = frame.copy()
 
         lane_boundaries = self.get_lane_boundaries(bird_eye_frame, data)
-        curvature = self.get_lane_curvature(bird_eye_frame, lane_boundaries)
-
         self.save_history_entry(lane_boundaries)
         lane_boundaries = self.average_history()
 
-        bframe = self.draw_lanes(bird_eye_frame, lane_boundaries) 
+        curvature = self.get_lane_curvature(bird_eye_frame, lane_boundaries)
+        self.save_history_curvature(curvature)
+        curvature = self.average_curvature()
+
+        bframe, _ , _ = self.draw_lanes(bird_eye_frame, lane_boundaries) 
         data['05a_lanes_still_undistorted'] = bframe.copy()
 
-        frame = self.draw_lanes(frame, lane_boundaries) 
+        frame, left_bottom_lane_x, right_bottom_lane_x = self.draw_lanes(frame, lane_boundaries) 
+        position = self.in_lane_position(left_bottom_lane_x, right_bottom_lane_x, frame.shape)
         data['05b_lanes_still_undistorted'] = frame.copy()
 
         frame = self.get_bird_eye_frame(frame, data, debug=False, inverse=True) 
@@ -289,7 +339,7 @@ class LanePipeline:
         frame = frame.astype('uint8')
         data['06_back_to_perspective'] = frame.copy()
 
-        frame = self.post_process(frame, curvature, text=text)
+        frame = self.post_process(frame, curvature, position, text=text)
         data['07_post_processed'] = frame.copy()
 
         return frame, data
