@@ -4,9 +4,14 @@ from libs.calibration import Calibration
 
 import matplotlib.pyplot as plt
 
+from libs.frame_info import FrameInfo
+
 class LanePipeline:
     def __init__(self):
         self.calibration = Calibration()
+        self.history=[]
+        self.history_lenght = 3
+        self.frame_index = 0
 
     def calibrate(self, folder_path: str):
         self.calibration.run(folder_path)
@@ -181,7 +186,7 @@ class LanePipeline:
         return lfit, rfit
 
     def get_lane_curvature(self,  binary_frame:np.ndarray, lane_boundaries):
-        # TODO get lane curvature
+        # TODO get lane curvature and position
         return None
 
     def draw_lanes(self, bgr_frame:np.ndarray, lane_boundaries):
@@ -218,16 +223,33 @@ class LanePipeline:
 
         return bgr_frame
 
-    def post_process(self, bgr_frame:np.ndarray, text:str=None):
+    def post_process(self, bgr_frame:np.ndarray, curvature, text:str=None):
         if text:
             cv2.putText(bgr_frame, f"{text}", (10,20), cv2.FONT_HERSHEY_PLAIN, 1, (0,255,0), lineType=cv2.LINE_AA)
         return bgr_frame
 
+    def save_history_entry(self, lane_boundaries):
+        self.history.append(FrameInfo(self.frame_index, lane_boundaries[0],lane_boundaries[1]))
+        self.history = self.history[-self.history_lenght:]
+        self.frame_index+=1
+
+    def average_history(self):
+        l_params = []
+        r_params = []
+
+        for h in self.history:
+            if h.left_params is not None:
+                l_params.append(np.array(h.left_params))
+            if h.right_params is not None:
+                r_params.append(np.array(h.right_params))
+        
+        l_params = np.mean(np.array(l_params), axis=0)
+        r_params = np.mean(np.array(r_params), axis=0)
+        return l_params, r_params
+
     def process_frame(self, bgr_frame:np.ndarray, text:str=None):
         # TODO generate all test images output
-        # TODO average with last frame, 
-        # TODO reuse lanes if new not found
-        # TODO challanges
+        # TODO challanges: ignore too much white, ignore to little white
 
         # Prepare variables
         frame  = bgr_frame.copy()
@@ -252,6 +274,9 @@ class LanePipeline:
         lane_boundaries = self.get_lane_boundaries(bird_eye_frame, data)
         curvature = self.get_lane_curvature(bird_eye_frame, lane_boundaries)
 
+        self.save_history_entry(lane_boundaries)
+        lane_boundaries = self.average_history()
+
         bframe = self.draw_lanes(bird_eye_frame, lane_boundaries) 
         data['05a_lanes_still_undistorted'] = bframe.copy()
 
@@ -264,7 +289,7 @@ class LanePipeline:
         frame = frame.astype('uint8')
         data['06_back_to_perspective'] = frame.copy()
 
-        frame = self.post_process(frame, text=text)
+        frame = self.post_process(frame, curvature, text=text)
         data['07_post_processed'] = frame.copy()
 
         return frame, data
