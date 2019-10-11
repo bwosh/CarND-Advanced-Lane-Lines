@@ -27,7 +27,7 @@ The pipeline
 2. Undistort image (after processing sample chessboard images on given camera)  
 ![Undistorted image](examples/straight_lines1_01_undistorted.jpg "Undistorted image")![Undistorted image](examples/test1_01_undistorted.jpg "Undistorted image")  
 
-3. Binarize image using color transforms (take Red value from RGB channels and combine it with Saturation channel of HLS color space)  
+3. Binarize image using color transforms & magnitude of sobels (image was grayscaled to sum of half RED channel of RGB color space and half SATURIATION channel of HLS color space. Then gradient magniture of x&y solbels was taken and finally binary added to RED & SATURATION channels multiplication)  
 ![Binarized image](examples/straight_lines1_02_bin_frame.jpg "Binarized image")![Binarized image](examples/test1_02_bin_frame.jpg "Binarized image")  
 
 4. Apply trapezoidal Region of Interest (ROI) shape of expected straigt lane  
@@ -47,6 +47,9 @@ Bottom start place is calculated basing on historam of bottom part of binary lan
 ![Raw image](examples/test1_hist.jpg "Raw image")
 
 8. Basing on centers of lanes inside areas find quadratic function that matches the points and plot the lanes  
+
+*For video processing: The quadratic function parameters are first averaged on 3 recent frames to get more stable result and overcome minor artefacts on binary image that may appear*
+  
 ![Raw image](examples/straight_lines1_05a_lanes_still_undistorted.jpg "Raw image")![Raw image](examples/test1_05a_lanes_still_undistorted.jpg "Raw image") 
 
 9. Perform lane drawing on bird-eye view of the original image  
