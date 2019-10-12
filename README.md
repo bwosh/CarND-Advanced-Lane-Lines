@@ -64,7 +64,9 @@ Bottom start place is calculated basing on historam of bottom part of binary lan
 
 ### Output video: 
 ![Raw image](examples/video.png "Raw image") 
-[Download video file](/examples/sample.mp4)
+Download Video File 1: [output frame with all subsequent stages of processing (as shown above)](/examples/sample.mp4)  
+
+Download video file 2: [output frame only](/examples/sample_clean.mp4)
 
 ---
 
@@ -73,3 +75,16 @@ Bottom start place is calculated basing on historam of bottom part of binary lan
 
 ---
 
+
+Discussion
+---
+### Current solution weak sides:
+- binary mask is vurnerable to some of irregularities on the road
+- used perspective wrap may be insufficient for very hard turning
+- current algorithm works only well on flas roads - it might be having troubled with hills and slopes
+- this algorithm may still have some problems when changing lanes (especially when being between lanes)
+
+### Possible improvements:
+- further improvement may be limiting the area of lane search to some margin of what was found on last frame (look ahead filters)
+- when calculating centers of windows (when sarching form curves) there might be applied some bounds - like lower and upper limit when the window should be skipped in curve calculation. This is to addres "minor false positive detections" and "too much noise" cases.
+- tweaking the arguments (binary mask, search windows parameters) is very challanging task and addressing it with deep learning model with big and diverse dataset will work much better
